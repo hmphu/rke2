@@ -1,0 +1,21 @@
+#cloud-init
+hostname: {{ hostname }}
+users:
+  - name: {{ user }}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - {{ authorized_keys }}
+
+package_update: true
+package_upgrade: true
+
+write_files:
+  - path: /etc/motd
+    content: |
+      Welcome to Kubernetes Node {{ hostname }}
+
+runcmd:
+  - swapoff -a
+  - sed -i '/ swap / s/^/#/' /etc/fstab

@@ -1,6 +1,6 @@
 YQ = yq
 
-.PHONY: all check-deps launch destroy purge status shell update-inventory ssh-master ssh-worker
+.PHONY: all check-deps launch destroy purge status shell update-inventory ssh-master ssh-worker create-vms create-vms-configs create-cloud-init-configs
 
 all: check-deps launch update-inventory run-ansible
 
@@ -57,8 +57,41 @@ check-deps:
 	else \
 		echo "✅ ansible is installed."; \
 	fi
+	
+	@if ! command -v jinja2 >/dev/null 2>&1; then \
+		echo "⚠️ jinja2 not found."; \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			echo "➡️ Installing jinja2 via Homebrew..."; \
+			brew install jinja2-cli; \
+		else \
+			echo "➡️ Installing jinja2 via pip..."; \
+			sudo pip3 install jinja2-cli; \
+		fi; \
+	else \
+		echo "✅ jinja2 is installed."; \
+	fi
 
-launch:
+create-cloud-init-configs:
+	@echo "🔨 Rendering cloud-init configs using vars.yml..."
+	@if [ "$$(uname)" = "Darwin" ] || [ "$$(uname)" = "Linux" ]; then \
+		./cloud-init/generate.sh > /dev/null 2>&1; \
+	else \
+		echo "⚠️ Windows detected. Please run cloud-init/generate.sh manually or use WSL."; \
+		exit 1; \
+	fi
+	@echo "✅ Rendered cloud-init/k8s-master-01.yaml using vars.yml"
+
+create-vms-configs: create-cloud-init-configs
+	@echo "🔨 Rendering vms.yml from templates/vms.yml.j2 using vars.yml..."
+	@if [ "$$(uname)" = "Darwin" ] || [ "$$(uname)" = "Linux" ]; then \
+		jinja2 templates/vms.yml.j2 vars.yml -o vms.yml > /dev/null 2>&1; \
+	else \
+		echo "⚠️ Windows detected. Please run jinja2 command manually or use WSL."; \
+		exit 1; \
+	fi
+	@echo "✅ Rendered vms.yml from templates/vms.yml.j2 using vars.yml"
+
+launch: create-vms-configs
 	@$(YQ) -r '.vms[] | .name' vms.yml | while read name; do \
 		cpus=$$($(YQ) -r ".vms[] | select(.name==\"$$name\") | .cpus" vms.yml); \
 		mem=$$($(YQ) -r ".vms[] | select(.name==\"$$name\") | .memory" vms.yml); \
@@ -97,7 +130,17 @@ shell:
 	@read -p "Enter instance name to shell into: " name; \
 	multipass shell $$name
 
-update-inventory:
+create-inventory-file:
+	@echo "🔨 Rendering inventory.yml from templates/inventory.yml.j2 using vars.yml..."
+	@if [ "$$(uname)" = "Darwin" ] || [ "$$(uname)" = "Linux" ]; then \
+		jinja2 templates/inventory.yml.j2 vars.yml -o inventory.yml > /dev/null 2>&1; \
+	else \
+		echo "⚠️ Windows detected. Please run jinja2 command manually or use WSL."; \
+		exit 1; \
+	fi
+	@echo "✅ Rendered inventory.yml from templates/inventory.yml.j2 using vars.yml"
+
+update-inventory: create-inventory-file
 	@echo "🛠️ Updating inventory.yml using VM's preferred network IPs..."
 	@$(YQ) -r '.vms[] | .name' vms.yml | while read name; do \
 		net="$$( $(YQ) -r ".vms[] | select(.name==\"$$name\") | .network" vms.yml )"; \
