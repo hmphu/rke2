@@ -98,6 +98,10 @@ launch: create-vms-configs
 		disk=$$($(YQ) -r ".vms[] | select(.name==\"$$name\") | .disk" vms.yml); \
 		cloud_init=$$($(YQ) -r ".vms[] | select(.name==\"$$name\") | .cloud_init" vms.yml); \
 		network=$$($(YQ) -r ".vms[] | select(.name==\"$$name\") | .network // \"\"" vms.yml); \
+		if multipass info "$$name" >/dev/null 2>&1; then \
+			echo "⚠️ VM $$name already exists. Skipping launch for $$name."; \
+			continue; \
+		fi; \
 		echo "🚀 Launching $$name with $$cpus CPU, $$mem RAM, $$disk disk"; \
 		if [ -n "$$network" ]; then \
 			echo "🌐 Using network interface: $$network"; \
@@ -146,15 +150,17 @@ update-inventory: create-inventory-file
 		net="$$( $(YQ) -r ".vms[] | select(.name==\"$$name\") | .network" vms.yml )"; \
 		if [ "$$(uname)" = "Darwin" ]; then \
 			host_if_ip="$$(ipconfig getifaddr $$net || true)"; \
+			host_if_broadcast="$$(ipconfig getoption $$net subnet_mask || true)"; \
 		else \
 			host_if_ip="$$(ip -f inet addr show $$net | grep -Po 'inet \K[\d.]+' | head -n 1 || true)"; \
+			host_if_broadcast="$$(ip -f inet addr show $$net | grep -Po 'brd \K[\d.]+' | head -n 1 || true)"; \
 		fi; \
-		if [ -z "$$host_if_ip" ]; then echo "❌ Could not find IP for interface $$net on host."; continue; fi; \
-		subnet="$$(echo $$host_if_ip | cut -d'.' -f1-3)"; \
+		if [ -z "$$host_if_ip" ] || [ -z "$$host_if_broadcast" ]; then echo "❌ Could not find IP for interface $$net on host."; continue; fi; \
+		subnet="$$(python3 -c "import ipaddress; import sys; ip = sys.argv[1]; mask = sys.argv[2]; net = ipaddress.IPv4Network(f'{ip}/{mask}', strict=False); print(net)" "$$host_if_ip" "$$host_if_broadcast" 2>/dev/null || echo '')"; \
 		allips="$$(multipass info $$name --format json | jq -r ".info.\"$$name\".ipv4[]")"; \
 		selected_ip=""; \
 		for ip in $$allips; do \
-			if echo $$ip | grep -q "^$$subnet\\."; then selected_ip="$$ip"; break; fi; \
+			if python3 -c "import ipaddress; import sys; ip = ipaddress.IPv4Address(sys.argv[1]); subnet = ipaddress.IPv4Network(sys.argv[2], strict=False); exit(0 if ip in subnet else 1)" "$$ip" "$$subnet" 2>/dev/null; then selected_ip="$$ip"; break; fi; \
 		done; \
 		if [ -n "$$selected_ip" ]; then \
 			echo "🔄 Setting $$name IP to $$selected_ip"; \
