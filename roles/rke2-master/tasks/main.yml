@@ -57,9 +57,9 @@
 
 - name: Ensure .kube directory exists for rke2
   file:
-    path: /home/rke2/.kube
+    path: /home/{{ ansible_user }}/.kube
     state: directory
-    owner: rke2
+    owner: "{{ ansible_user }}"
     mode: '0755'
 
 - name: Read original kubeconfig
@@ -74,21 +74,21 @@
 - name: Write updated kubeconfig to ~/.kube/config
   copy:
     content: "{{ kubeconfig_content }}"
-    dest: /home/rke2/.kube/config
-    owner: rke2
+    dest: /home/{{ ansible_user }}/.kube/config
+    owner: "{{ ansible_user }}"
     mode: '0600'
 
 - name: Show updated kubeconfig IP info
   debug:
     msg: >
       ~/.kube/config has been written using server IP {{ ansible_host }}.
-      Try: KUBECONFIG=/home/rke2/.kube/config kubectl get nodes
+      Try: KUBECONFIG=/home/{{ ansible_user }}/.kube/config kubectl get nodes
 
 - name: Show SSH connection information
   debug:
     msg: >
       To connect to this master node via SSH, use:
-      ssh -i {{ ansible_ssh_private_key_file | default('~/.ssh/id_ed25519') }} {{ ansible_user }}@{{ ansible_host }}
+      ssh -i {{ ansible_ssh_private_key_file | default('~/.ssh/id_rsa') }} {{ ansible_user }}@{{ ansible_host }}
 
 - name: Install Addons - local-path storage class
   ansible.builtin.import_tasks: addons/local-path-storage.yml

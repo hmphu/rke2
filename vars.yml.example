@@ -1,18 +1,34 @@
 # Adjust the network interface as needed
 network_interface: en0
 
-# change this to your public key
-ssh_key:
-  - ssh-rsa AAAAB3...
+# Adjust the user as needed
+ansible_user: rke2
 
-# Define your cluster VMs
-vms:
+# Adjust the private key file path as needed
+ansible_ssh_private_key_file: ~/.ssh/id_rsa
+
+# change this to your public key
+authorized_keys:
+  - ssh-rsa AAAAB....
+
+# Setting the master VMs
+master_vms:
   - name: k8s-master-01
     cpus: 4
     memory: 4G
     disk: 20G
 
+# Setting the worker VMs
+worker_vms:
   - name: k8s-worker-01
+    cpus: 2
+    memory: 2G
+    disk: 15G
+  - name: k8s-worker-02
+    cpus: 2
+    memory: 2G
+    disk: 15G
+  - name: k8s-worker-03
     cpus: 2
     memory: 2G
     disk: 15G

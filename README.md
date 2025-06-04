@@ -1,28 +1,6 @@
 # RKE2 Kubernetes Cluster Automation
 
-<div align="center">
-
-## 🚢 Powered by
-
-<table>
-  <tr>
-    <td align="center" width="33%">
-      <img src="https://www.rancher.com/assets/img/logos/rancher-logo-stacked-color.svg" alt="Rancher Logo" width="250"/>
-    </td>
-    <td align="center" width="33%">
-      <img src="https://res.cloudinary.com/canonical/image/fetch/f_auto,q_auto,fl_sanitize,c_fill,w_720/https://lh3.googleusercontent.com/hZHbXA0bvKJ089pTXuoTPgv-T4eHBIvmfZ4nh4tkKg2OoZ8cTQNtZXLl6zeXjNc4Df0BnxzfF4pTFoCHWm7WFz6ci8h4QzqnVA80eWcNbwdZegHhJRea-cWr05wTw-WDbbzuIumrIGZNnl0Xxw" alt="Multipass Logo" width="250"/>
-    </td>
-    <td align="center" width="33%">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Ansible_logo.svg/1664px-Ansible_logo.svg.png" alt="Ansible Logo" width="250"/>
-    </td>
-  </tr>
-</table>
-
-### *Automated Kubernetes cluster deployment with RKE2, Multipass, and Ansible*
-
-</div>
-
-A robust automation project for deploying RKE2 (Rancher Kubernetes Engine 2) clusters on local virtual machines using Multipass, cloud-init, and Ansible.
+This project is for deploying RKE2 (Rancher Kubernetes Engine 2) clusters on local virtual machines using Multipass, cloud-init, and Ansible.
 
 ## 🚀 Overview
 
@@ -40,26 +18,43 @@ The project will check and install these dependencies if needed:
 - Ansible
 - yq
 - jq
+- jinja2
 
 ## 📁 Project Structure
 
 ```
-├── inventory.yml           # Ansible inventory for cluster nodes
 ├── Makefile                # Automation commands
 ├── playbook.yml            # Main Ansible playbook
-├── README.md               # This documentation
-├── vms.yml                 # VM specifications
-├── cloud-init/             # Initial node configurations
-│   ├── master-01.yaml      # Master node configuration
-│   ├── worker-01.yaml      # Worker node configurations
-│   ├── worker-02.yaml      # Worker node configurations
-│   └── worker-03.yaml      # Worker node configurations
+├── README.md               # This documentation(main)
+├── vars.yml.example        # Example variables file
+├── cloud-init/             # Folder contain VM specs *.yml files (auto-generated)
+│   ├── generate.sh         # Script to generate VM specs files
+├── templates/              # Jinja2 templates for dynamic config
+│   ├── inventory.yml.j2    # Inventory template
+│   ├── cloud-init.yml.j2   # Cloud-init template
+│   └── vms.yml.j2          # VM specs template
 └── roles/                  # Ansible roles
     ├── rke2-master/        # Master node setup
+    │   └── tasks/
+    │       ├── main.yml
+    │       └── addons/
+    │           └── *.yml   # RKE2 addons
     └── rke2-worker/        # Worker node setup
+        └── tasks/
+            └── main.yml
 ```
 
-## 🔧 Cluster Configuration
+These files will be _auto-generated_ by Make with values from `vars.yml` and from `multipass` VMs
+
+```
+├── inventory.yml           # Ansible inventory for cluster nodes
+├── vms.yml                 # VM specifications
+├── cloud-init/             # Initial node configurations and scripts
+|   └── *.yml               # Master node cloud-init config
+└── kube-config             # Kubeconfig for cluster access
+```
+
+## 🔧 Sample Cluster Configuration
 
 - **Master Node**: 
   - 4 CPUs, 4GB RAM, 20GB storage
@@ -73,7 +68,18 @@ The project will check and install these dependencies if needed:
 
 ## 🛠️ Usage
 
+### Setting Up the Variables
+
+Copy the `vars.yml.example` file to `vars.yml` and edit with your own values
+
+- `network_interface`: Adjust the network interface as needed, this must be the interface that [configured as local bridged network in Multipass](https://documentation.ubuntu.com/multipass/en/latest/reference/settings/local-bridged-network/)
+- `ansible_user`: Adjust the user as needed
+- `ansible_ssh_private_key_file`: Adjust the private key file path
+- `authorized_keys`: Adjust with public key content, which match the private key configured above
+
 ### Setting Up the Cluster
+
+After create the `vars.yml` file you are now ready to create VMs with Multipass and setup RKE2 cluster
 
 ```bash
 # Deploy the complete cluster
@@ -87,10 +93,13 @@ make shell
 ```
 
 The deployment process will:
-1. Launch the virtual machines with Multipass
-2. Configure networking and host connections
-3. Install RKE2 on master and worker nodes
-4. Verify node status with well-formatted output
+1. Check and install dependencies if needed
+2. Create (`vms.yml`, `cloud-init/*.yml`) config files
+3. Launch the virtual machines with Multipass
+4. Configure networking and host connections
+5. Create `inventory.yml` file
+6. Install RKE2 on master and worker nodes
+7. Verify node status with well-formatted output
 
 ### Managing the Cluster
 
@@ -101,7 +110,7 @@ make update-inventory
 # Run Ansible playbook separately
 make run-ansible
 
-# Connect to master node via SSH
+# Connect to master node via SSH (interactive selection)
 make ssh-master
 
 # Connect to a worker node via SSH (interactive selection)
@@ -122,12 +131,11 @@ make purge
 - Configures proper node labels for workload distribution
 - Performs automatic node health checks after deployment
 - Displays well-formatted cluster status after setup completes
-- Shows SSH connection information for all nodes
 
 ## 🔒 Security Features
 
 - Swap disabled on all nodes for Kubernetes compatibility
-- User 'rke2' with sudo privileges for management
+- User `ansible_user` with sudo privileges for management
 - SSH key-based authentication
 
 ## 💡 How It Works
@@ -161,19 +169,25 @@ k8s-worker-02       Ready     worker          192.168.50.xxx  v1.32.5+rke2r1
 k8s-worker-03       Ready     worker          192.168.50.xxx  v1.32.5+rke2r1  
 ```
 
-A summary section also provides key metrics:
-
-```
-==== SYSTEM SUMMARY =====
-Total Nodes:  4
-Ready Nodes:  4
-System Pods:  23
-Running Pods: 23
-=======================
-```
-
 This ensures your cluster is fully functional before you start using it.
 
-## 🤝 Contributing
+## 💡 For Cloud Server Setup
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+If you already have VMs running on cloud providers (AWS, GCP, Azure, etc.) with public IP addresses and SSH key authentication configured, you can skip the Multipass VM creation and directly set up RKE2 on your existing infrastructure.
+
+### Prerequisites for Cloud Setup
+
+- VMs with Ubuntu 22.04 or later
+- SSH key authentication configured
+- Public IP addresses accessible from your machine
+- User with sudo privileges on all VMs
+
+### Manual Setup Steps
+
+1. Create `inventory.yml` manually with correct value for:
+    - masters, workers ip addresses
+    - ansible username
+    - private key file path
+2. Execute one of the following command to set up RKE2 on your VMs:
+    - Using Make: `make run-ansible`
+    - Directy run ansible: `ansible-playbook -i inventory.yml playbook.yml` 

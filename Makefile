@@ -1,8 +1,8 @@
 YQ = yq
 
-.PHONY: all check-deps launch destroy purge status shell update-inventory ssh-master ssh-worker create-vms create-vms-configs create-cloud-init-configs
+.PHONY: all check-deps launch-vms destroy purge status shell update-inventory ssh-master ssh-worker create-vms
 
-all: check-deps launch update-inventory run-ansible
+all: check-deps launch-vms update-inventory run-ansible get-kube-config
 
 check-deps:
 	@echo "🔍 Checking dependencies..."
@@ -91,7 +91,7 @@ create-vms-configs: create-cloud-init-configs
 	fi
 	@echo "✅ Rendered vms.yml from templates/vms.yml.j2 using vars.yml"
 
-launch: create-vms-configs
+launch-vms: create-vms-configs
 	@$(YQ) -r '.vms[] | .name' vms.yml | while read name; do \
 		cpus=$$($(YQ) -r ".vms[] | select(.name==\"$$name\") | .cpus" vms.yml); \
 		mem=$$($(YQ) -r ".vms[] | select(.name==\"$$name\") | .memory" vms.yml); \
@@ -188,8 +188,11 @@ run-ansible:
 	@echo "✅ Ansible playbook execution completed."
 
 ssh-master:
-	@echo "🔑 Connecting to master node via SSH..."
-	@master_ip=$$($(YQ) -r '.all.children.masters.hosts."k8s-master-01".ansible_host' inventory.yml); \
+	@echo "🔎 Available master nodes:"
+	@$(YQ) -r '.all.children.masters.hosts | keys | .[]' inventory.yml | nl
+	@read -p "Enter the master number to connect to: " master_num; \
+	master_name=$$($(YQ) -r '.all.children.masters.hosts | keys | .['$$((master_num-1))']' inventory.yml); \
+	master_ip=$$($(YQ) -r '.all.children.masters.hosts."'$$master_name'".ansible_host' inventory.yml); \
 	ssh_key=$$($(YQ) -r '.all.vars.ansible_ssh_private_key_file' inventory.yml); \
 	ssh_user=$$($(YQ) -r '.all.vars.ansible_user' inventory.yml); \
 	echo "📝 SSH Command: ssh -i $$ssh_key $$ssh_user@$$master_ip"; \
@@ -205,3 +208,20 @@ ssh-worker:
 	ssh_user=$$($(YQ) -r '.all.vars.ansible_user' inventory.yml); \
 	echo "📝 SSH Command: ssh -i $$ssh_key $$ssh_user@$$worker_ip"; \
 	ssh -i $$ssh_key $$ssh_user@$$worker_ip
+
+get-kube-config:
+	@echo "🔄 Getting kube-config from first master..."
+	@master_name=$$($(YQ) -r '.all.children.masters.hosts | keys | .[0]' inventory.yml); \
+	master_ip=$$($(YQ) -r '.all.children.masters.hosts."'$$master_name'".ansible_host' inventory.yml); \
+	ssh_key=$$($(YQ) -r '.all.vars.ansible_ssh_private_key_file' inventory.yml); \
+	ssh_user=$$($(YQ) -r '.all.vars.ansible_user' inventory.yml); \
+	echo "📝 Copying kube-config from $$ssh_user@$$master_ip:/home/$$ssh_user/.kube/config"; \
+	if [ "$$(uname)" = "Darwin" ] || [ "$$(uname)" = "Linux" ]; then \
+		scp -i $$ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $$ssh_user@$$master_ip:/home/$$ssh_user/.kube/config ./kube-config; \
+	else \
+		echo "⚠️ Windows detected. Please use WSL or manually run:"; \
+		echo "    scp -i $$ssh_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $$ssh_user@$$master_ip:/home/$$ssh_user/.kube/config ./kube-config"; \
+		exit 1; \
+	fi; \
+	echo "✅ Kube-config saved to ./kube-config"
+

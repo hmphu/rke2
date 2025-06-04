@@ -20,6 +20,12 @@
   until: local_path_status.rc == 0
   changed_when: false
 
+- name: Patch storageclass local-path to be default
+  shell: |
+    kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+
 - name: Verify local-path storage class installation
   debug:
     msg: "✅ Local-path storage class has been successfully installed and set as default"

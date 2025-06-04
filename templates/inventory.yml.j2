@@ -1,0 +1,19 @@
+all:
+  children:
+    masters:
+      hosts:
+{% for master in master_vms %}
+        {{ master.name }}:
+          ansible_host:
+{% endfor %}
+    workers:
+      hosts:
+{% for worker in worker_vms %}
+        {{ worker.name }}:
+          ansible_host:
+{% endfor %}
+  vars:
+    ansible_user: {{ ansible_user }}
+    ansible_ssh_private_key_file: {{ ansible_ssh_private_key_file }}
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    ansible_python_interpreter:  /usr/bin/python3

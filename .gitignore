@@ -1,6 +1,8 @@
 .DS_Store
+kube-config
 cloud-init/*
 !cloud-init/.gitkeep
 !cloud-init/generate.sh
-!cloud-init/template.yml.j2
 vars.yml
+inventory.yml
+vms.yml

@@ -3,7 +3,7 @@
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-TEMPLATE="$SCRIPT_DIR/template.yml.j2"
+TEMPLATE="$SCRIPT_DIR/../templates/cloud-init.yml.j2"
 VARS="$SCRIPT_DIR/../vars.yml"
 OUTDIR="$SCRIPT_DIR/../cloud-init"
 
@@ -14,8 +14,8 @@ mkdir -p "$OUTDIR"
 network_interface=$(yq -r '.network_interface' "$VARS")
 ansible_user=$(yq -r '.ansible_user' "$VARS")
 
-# Join all ssh_key lines into a single string (for multi-line keys)
-ssh_key=$(yq -r '.ssh_key | join("\n")' "$VARS")
+# Join all authorized_keys lines into a single string (for multi-line keys)
+authorized_keys=$(yq -r '.authorized_keys | join("\n")' "$VARS")
 
 render_vm_group() {
   local group_name=$1
@@ -31,7 +31,7 @@ render_vm_group() {
     cat > "$tmpfile" <<EOF
 hostname: $name
 user: $ansible_user
-ssh_key: $ssh_key
+authorized_keys: $authorized_keys
 cpus: $cpus
 memory: $memory
 disk: $disk

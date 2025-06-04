@@ -1,0 +1,17 @@
+vms:
+{% for vm in master_vms %}
+  - name: {{ vm.name }}
+    cpus: {{ vm.cpus }}
+    memory: {{ vm.memory }}
+    disk: {{ vm.disk }}
+    cloud_init: cloud-init/{{ vm.name }}.yml
+    network: {{ network_interface }}
+{% endfor %} 
+{% for vm in worker_vms %}
+  - name: {{ vm.name }}
+    cpus: {{ vm.cpus }}
+    memory: {{ vm.memory }}
+    disk: {{ vm.disk }}
+    cloud_init: cloud-init/{{ vm.name }}.yml
+    network: {{ network_interface }}
+{% endfor %} 
