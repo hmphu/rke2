@@ -1,0 +1,25 @@
+- name: Create local-path storage class manifest directory
+  file:
+    path: /var/lib/rancher/rke2/server/manifests
+    state: directory
+    mode: "0755"
+
+- name: Download local-path storage class manifest
+  get_url:
+    url: https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.31/deploy/local-path-storage.yaml
+    dest: /var/lib/rancher/rke2/server/manifests/rke2-local-path-storage.yaml
+    mode: "0644"
+
+- name: Wait for local-path storage class to be ready
+  shell: kubectl get storageclass local-path
+  register: local_path_status
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  retries: 12
+  delay: 10
+  until: local_path_status.rc == 0
+  changed_when: false
+
+- name: Verify local-path storage class installation
+  debug:
+    msg: "✅ Local-path storage class has been successfully installed and set as default"

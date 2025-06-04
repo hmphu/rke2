@@ -89,3 +89,7 @@
     msg: >
       To connect to this master node via SSH, use:
       ssh -i {{ ansible_ssh_private_key_file | default('~/.ssh/id_ed25519') }} {{ ansible_user }}@{{ ansible_host }}
+
+- name: Install Addons - local-path storage class
+  ansible.builtin.import_tasks: addons/local-path-storage.yml
+
